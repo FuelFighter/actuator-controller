@@ -1,0 +1,87 @@
+/*
+ * FF:Actuator_2018.c
+ *
+ * Created: 21/12/17 22:00
+ * Author : Sivert
+ */ 
+#ifndef F_CPU
+	#define F_CPU 8000000UL
+#endif
+
+//#include <stdlib.h>
+//#include <stdint.h>
+#include <avr/io.h>
+#include <util/delay.h>
+#include <math.h>
+#include <avr/interrupt.h>
+#include <avr/pgmspace.h>
+#include <stdio.h>
+#include <string.h>
+
+#include "UniversalModuleDrivers/timer.h"
+#include "UniversalModuleDrivers/rgbled.h"
+#include "ActuatorDrivers/i2c_master.h"
+#include "ActuatorDrivers/actuator.h"
+#include "ActuatorDrivers/ads_1115.h"
+#include "AVR-UART-lib/usart.h"
+
+
+
+
+volatile int16_t adcReading = 0;
+
+int main (void)
+{	
+	DDRE	|= (1 <<PE4 )  | (1 <<PE5 );
+	TCCR3B	|=(1<<CS00);  //NO PRESCALER
+	
+	TCCR3A	|= (1<<COM3B1) |(1<<COM3C0) | (1<<COM3C1) | (1<<WGM31); //COM3B clear on comp. match, omvendt com3c  |(WGM30<<1)| |
+	TCCR3B	|= (1<<WGM32)  |(1<<WGM33);
+	
+	ICR3 = 256;
+	
+	rgbled_init();
+	rgbled_turn_on(LED_ALL);
+	uint16_t duty = 140;//lave verdier = innover |
+	i2c_init();
+	
+	ads_1115_write_config();
+
+	
+	
+	uart_init(BAUD_CALC(500000)); // 8n1 transmission is set as default
+	sei();
+	
+	while(1){
+		adcReading=ads_1115_get_reading();
+		if (adcReading < 100)
+		duty=170;
+		if (adcReading > 20000)
+		duty=100;
+		rgbled_toggle(LED_ALL);
+		_delay_ms(40);
+	
+		actuator_pwmSpeed(duty);
+		
+		_delay_ms(30);
+		
+		//actuator_out();
+		_delay_ms(30);
+		
+		uart_putint(duty);
+		uart_puts("\r\n");
+		//_delay_ms(1000);
+		if(uart_AvailableBytes()!=0){
+			duty=uart_getint();
+			uart_flush();
+			
+			}
+		
+				
+				
+	}
+	
+	
+	
+	/* Insert application code here, after the board has been initialized. */
+}
