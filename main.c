@@ -217,6 +217,7 @@ int main (void)
 								
 					if(rx.data.u8[0]==0){ reference_gear = 0; x_ref = idlePosition;}
 					if(rx.data.u8[0]==1){ reference_gear = 1; x_ref = firstGearPosition;}
+					if(rx.data.u8[0]==2){ reference_gear = 2; x_ref = secondGearPosition;}
 				}
 			}
 			task_is_done(TASK_CAN_RX);
