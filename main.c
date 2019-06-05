@@ -8,6 +8,9 @@
 #define ACTUATOR_CAN_ID 0x120		// CAN ID from actuator to controller (transmit) (120 for MC_1, 220 for MC_2)
 #define CONTROLLER_CAN_ID 0x251		// CAN ID from controller to actuator	(receive) (251 for MC_1, 261 for MC_2)
 
+#define CONSTANT_ERROR_LIMIT 100 // 
+#define CONSTANT_ERROR_CHANGE_THRESHOLD 1
+
 #ifndef F_CPU
 	#define F_CPU 8000000UL
 #endif
@@ -75,6 +78,22 @@ void setpwm(uint8_t duty){
 		OCR3B= duty;
 }
 
+uint8_t check_if_stuck(int16_t e, int16_t e_prev, long* error_counter_pointer) {
+	uint8_t is_stuck = 0;
+	
+	if (abs(e-e_prev) > CONSTANT_ERROR_CHANGE_THRESHOLD) {
+		*error_counter_pointer++;
+	}
+	else if (*error_counter_pointer > 0) {
+		*error_counter_pointer--;
+	}
+	
+	if (*error_counter_pointer > CONSTANT_ERROR_LIMIT) {
+		is_stuck = 1;
+	}
+	
+	return is_stuck;
+}
 
 int main (void)
 {	
@@ -83,6 +102,9 @@ int main (void)
 	rgbled_turn_on(LED_ALL);
 	uint8_t duty = 20;
 	int16_t x, x_ref, e, u;
+	int16_t e_prev = 0;
+	long constant_error_counter = 0;
+	uint8_t is_stuck = 0;
 	float kp = 0.7;
 	char msg[22]; // heading, 20 digit bytes, NULL
 	
@@ -225,13 +247,17 @@ int main (void)
 			x = ads_1115_get_reading();
 			e = x_ref-x;
 			u = kp*e+128;
+			
+			is_stuck = check_if_stuck(e, e_prev, &constant_error_counter);
+			
 			if(u>255) u = 255;
-			if(u<0) u = 0;
+			if(u<0 || is_stuck) u = 0;
 			actuator_pwmSpeed(u);
 			//check if target position has been reached
 			if(e<POSITION_TOLERANCE && -e<POSITION_TOLERANCE){
 				current_gear = reference_gear;
 			}
+			e_prev = e;
 			task_is_done(TASK_P_CONTROLLER);
 		}
 		if(task_is_due(TASK_SINE)){
