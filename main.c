@@ -5,8 +5,8 @@
  * Author : Johannes Nadler
  */ 
 
-#define ACTUATOR_CAN_ID 0x120		// CAN ID from actuator to controller (transmit)
-#define CONTROLLER_CAN_ID 0x251		// CAN ID from controller to actuator	(receive)
+#define ACTUATOR_CAN_ID 0x120		// CAN ID from actuator to controller (transmit) (120 for MC_1, 220 for MC_2)
+#define CONTROLLER_CAN_ID 0x251		// CAN ID from controller to actuator	(receive) (251 for MC_1, 261 for MC_2)
 
 #ifndef F_CPU
 	#define F_CPU 8000000UL
