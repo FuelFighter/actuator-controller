@@ -250,8 +250,15 @@ int main (void)
 			
 			is_stuck = check_if_stuck(e, e_prev, &constant_error_counter);
 			
-			if(u>255) u = 255;
-			if(u<0 || is_stuck) u = 0;
+			if(is_stuck) {
+				u = 128;
+			}
+			else if(u>255) {
+				u = 255;
+			}
+			else if(u<0) {
+				u = 0;
+			}
 			actuator_pwmSpeed(u);
 			//check if target position has been reached
 			if(e<POSITION_TOLERANCE && -e<POSITION_TOLERANCE){
