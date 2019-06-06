@@ -142,10 +142,10 @@ int main (void)
 		if (task_is_due(TASK_LED)){
 			rgbled_toggle(LED_BLUE);
 			if (is_stuck) {
-				rgbled_turn_off(LED_RED)
+				rgbled_turn_off(LED_RED);
 				rgbled_turn_on(LED_GREEN);
 			} else {
-				rgbled_turn_off(LED_GREEN)
+				rgbled_turn_off(LED_GREEN);
 				rgbled_turn_on(LED_RED);
 			}
 			task_is_done(TASK_LED);
@@ -258,7 +258,7 @@ int main (void)
 			e = x_ref-x;
 			u = kp*e+128;
 			
-			is_stuck = check_if_stuck(e, e_prev, &constant_error_counter)
+			is_stuck = check_if_stuck(e, e_prev, &constant_error_counter);
 			
 			if(is_stuck) {
 				u = 128;
