@@ -106,7 +106,7 @@ int main (void)
 	uint8_t duty = 20;
 	int16_t x, x_ref, e, u;
 	int16_t e_prev = 0;
-	long constant_error_counter = 0;
+	int constant_error_counter = 0;
 	uint8_t is_stuck = 0;
 	float kp = 0.7;
 	char msg[22]; // heading, 20 digit bytes, NULL
@@ -141,7 +141,7 @@ int main (void)
 		}
 		if (task_is_due(TASK_LED)){
 			rgbled_toggle(LED_BLUE);
-			if (is_stuck) {
+			if (!is_stuck) {
 				rgbled_turn_off(LED_RED);
 				rgbled_turn_on(LED_GREEN);
 			} else {
