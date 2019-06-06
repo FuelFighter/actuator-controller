@@ -9,6 +9,7 @@
 #define CONTROLLER_CAN_ID 0x251		// CAN ID from controller to actuator	(receive) (251 for MC_1, 261 for MC_2)
 
 #define CONSTANT_ERROR_LIMIT 100 // 
+#define CONSTANT_ERROR_RESET_LIMIT 50
 #define CONSTANT_ERROR_CHANGE_THRESHOLD 1
 
 #ifndef F_CPU
@@ -81,7 +82,7 @@ void setpwm(uint8_t duty){
 uint8_t check_if_stuck(int16_t e, int16_t e_prev, long* error_counter_pointer) {
 	uint8_t is_stuck = 0;
 	
-	if (abs(e-e_prev) > CONSTANT_ERROR_CHANGE_THRESHOLD) {
+	if (abs(e-e_prev) < CONSTANT_ERROR_CHANGE_THRESHOLD) {
 		*error_counter_pointer++;
 	}
 	else if (*error_counter_pointer > 0) {
@@ -90,6 +91,8 @@ uint8_t check_if_stuck(int16_t e, int16_t e_prev, long* error_counter_pointer) {
 	
 	if (*error_counter_pointer > CONSTANT_ERROR_LIMIT) {
 		is_stuck = 1;
+	} else if (*error_counter_pointer < CONSTANT_ERROR_RESET_LIMIT  && 0) {
+		is_stuck = 0;
 	}
 	
 	return is_stuck;
@@ -248,9 +251,8 @@ int main (void)
 			e = x_ref-x;
 			u = kp*e+128;
 			
-			is_stuck = check_if_stuck(e, e_prev, &constant_error_counter);
 			
-			if(is_stuck) {
+			if(check_if_stuck(e, e_prev, &constant_error_counter)) {
 				u = 128;
 			}
 			else if(u>255) {
