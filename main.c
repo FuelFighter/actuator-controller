@@ -8,9 +8,11 @@
 #define ACTUATOR_CAN_ID 0x120		// CAN ID from actuator to controller (transmit) (120 for MC_1, 220 for MC_2)
 #define CONTROLLER_CAN_ID 0x251		// CAN ID from controller to actuator	(receive) (251 for MC_1, 261 for MC_2)
 
-#define CONSTANT_ERROR_LIMIT 100 // 
-#define CONSTANT_ERROR_RESET_LIMIT 50
-#define CONSTANT_ERROR_CHANGE_THRESHOLD 1
+#define CONSTANT_ERROR_LIMIT 200 // 
+#define CONSTANT_ERROR_RESET_LIMIT 5000
+#define CONSTANT_ERROR_CHANGE_THRESHOLD 25000
+
+#define E_PREV_N 16
 
 #ifndef F_CPU
 	#define F_CPU 8000000UL
@@ -79,24 +81,7 @@ void setpwm(uint8_t duty){
 		OCR3B= duty;
 }
 
-uint8_t check_if_stuck(int16_t e, int16_t e_prev, long* error_counter_pointer) {
-	uint8_t is_stuck = 0;
-	
-	if (abs(e-e_prev) < CONSTANT_ERROR_CHANGE_THRESHOLD) {
-		*error_counter_pointer++;
-	}
-	else if (*error_counter_pointer > 0) {
-		*error_counter_pointer--;
-	}
-	
-	if (*error_counter_pointer > CONSTANT_ERROR_LIMIT) {
-		is_stuck = 1;
-	} else if (*error_counter_pointer < CONSTANT_ERROR_RESET_LIMIT  && 0) {
-		is_stuck = 0;
-	}
-	
-	return is_stuck;
-}
+
 
 int main (void)
 {	
@@ -104,9 +89,12 @@ int main (void)
 	rgbled_init();
 	rgbled_turn_on(LED_BLUE);
 	uint8_t duty = 20;
-	int16_t x, x_ref, e, u;
+	int16_t x, x_ref, x_ref_prev, e, u;
 	int16_t e_prev = 0;
-	int constant_error_counter = 0;
+	int16_t e_prev_array[E_PREV_N] = {0};
+	int8_t e_prev_i = 0;
+	long sum_of_squared_error = 0;
+	long constant_error_counter = 0;
 	uint8_t is_stuck = 0;
 	float kp = 0.7;
 	char msg[22]; // heading, 20 digit bytes, NULL
@@ -121,10 +109,11 @@ int main (void)
 	can_init(0,0);
 	sei();
 	
-	firstGearPosition = eeprom_read_word((uint16_t*)46);
-	secondGearPosition = eeprom_read_word((uint16_t*)44);
-	idlePosition = eeprom_read_word((uint16_t*)42);
+	firstGearPosition = eeprom_read_word((uint16_t*)46); //dummy_value 18200
+	secondGearPosition = eeprom_read_word((uint16_t*)44); //dummy_value 22000
+	idlePosition = eeprom_read_word((uint16_t*)42); //dummy_value 20000
 	x_ref = firstGearPosition;
+	x_ref_prev = x_ref;
 	
 	task_start(TASK_LED, 1000);	//task 1 is due after 1000 interrupt cycles 
 	task_start(TASK_UART_WRITE,50);
@@ -159,10 +148,11 @@ int main (void)
 			uart_puts("|");
 			uart_putint(x);
 			uart_puts("\r\n");*/
-
-						uart_putint(x_ref);
-						uart_puts("|");
 						uart_putint(x);
+						uart_puts("|");
+						uart_putint(e);
+						uart_puts("|");
+						uart_putlong(constant_error_counter);
 						uart_puts("|");
 						uart_putint(u);
 						uart_puts("|");
@@ -170,7 +160,7 @@ int main (void)
 						uart_puts("|");
 						uart_putint(current_gear);
 						uart_puts("|");
-						uart_putlong(adr);
+						uart_putlong(sum_of_squared_error);
 						uart_puts("|");
 						uart_putlong(getEncoderSpeed16());
 						uart_puts("\r\n");
@@ -258,7 +248,32 @@ int main (void)
 			e = x_ref-x;
 			u = kp*e+128;
 			
-			is_stuck = check_if_stuck(e, e_prev, &constant_error_counter);
+			e_prev_array[e_prev_i] = e;
+			
+			e_prev_i = (e_prev_i + 1) % E_PREV_N;
+			if (e_prev_i) {
+				e_prev = e_prev_array[e_prev_i- 1];
+			} else {
+				e_prev = e_prev_array[E_PREV_N];
+			}
+			sum_of_squared_error += e*e - e_prev*e_prev;
+			
+			if (sum_of_squared_error < CONSTANT_ERROR_CHANGE_THRESHOLD) {
+				constant_error_counter++;
+			}
+			else if (constant_error_counter > 0) {
+				constant_error_counter--;
+			}
+			if (x_ref != x_ref_prev)
+			{
+				constant_error_counter = 0;
+			}
+			
+			if (constant_error_counter > CONSTANT_ERROR_LIMIT) {
+				is_stuck = 1;
+			} else if (constant_error_counter < CONSTANT_ERROR_RESET_LIMIT) {
+				is_stuck = 0;
+			}
 			
 			if(is_stuck) {
 				u = 128;
