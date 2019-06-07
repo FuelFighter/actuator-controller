@@ -8,6 +8,10 @@
 #define ACTUATOR_CAN_ID 0x120		// CAN ID from actuator to controller (transmit) (120 for MC_1, 220 for MC_2)
 #define CONTROLLER_CAN_ID 0x251		// CAN ID from controller to actuator	(receive) (251 for MC_1, 261 for MC_2)
 
+#define CONSTANT_ERROR_LIMIT 300 // 
+#define CONSTANT_ERROR_RESET_LIMIT 200
+#define CONSTANT_ERROR_CHANGE_THRESHOLD 40
+
 #ifndef F_CPU
 	#define F_CPU 8000000UL
 #endif
@@ -76,13 +80,18 @@ void setpwm(uint8_t duty){
 }
 
 
+
 int main (void)
 {	
 	pwm_start();	//inits pwm for h bridge control
 	rgbled_init();
-	rgbled_turn_on(LED_ALL);
+	rgbled_turn_on(LED_BLUE);
 	uint8_t duty = 20;
-	int16_t x, x_ref, e, u;
+	int16_t x, x_ref, x_ref_prev, e, u, u0;
+	int16_t e_prev = 0;
+	long constant_error_counter = 0;
+	uint8_t is_stuck = 0;
+	u0 = 128;
 	float kp = 0.7;
 	char msg[22]; // heading, 20 digit bytes, NULL
 	
@@ -100,6 +109,7 @@ int main (void)
 	secondGearPosition = eeprom_read_word((uint16_t*)44);
 	idlePosition = eeprom_read_word((uint16_t*)42);
 	x_ref = firstGearPosition;
+	x_ref_prev = x_ref;
 	
 	task_start(TASK_LED, 1000);	//task 1 is due after 1000 interrupt cycles 
 	task_start(TASK_UART_WRITE,50);
@@ -115,7 +125,14 @@ int main (void)
 			
 		}
 		if (task_is_due(TASK_LED)){
-			rgbled_toggle(LED_ALL);
+			rgbled_toggle(LED_BLUE);
+			if (!is_stuck) {
+				rgbled_turn_off(LED_RED);
+				rgbled_turn_on(LED_GREEN);
+			} else {
+				rgbled_turn_off(LED_GREEN);
+				rgbled_turn_on(LED_RED);
+			}
 			task_is_done(TASK_LED);
 		}
 		if (task_is_due(TASK_UART_WRITE)){
@@ -130,17 +147,17 @@ int main (void)
 
 						uart_putint(x_ref);
 						uart_puts("|");
-						uart_putint(x);
+						uart_putint(e);
 						uart_puts("|");
 						uart_putint(u);
 						uart_puts("|");
-						uart_putint(reference_gear);
+						uart_putlong(constant_error_counter);
 						uart_puts("|");
 						uart_putint(current_gear);
 						uart_puts("|");
-						uart_putlong(adr);
+						uart_putint(u != 128);
 						uart_puts("|");
-						uart_putlong(getEncoderSpeed16());
+						uart_putint(is_stuck);
 						uart_puts("\r\n");
 						
 			task_is_done(TASK_UART_WRITE);
@@ -225,13 +242,48 @@ int main (void)
 			x = ads_1115_get_reading();
 			e = x_ref-x;
 			u = kp*e+128;
-			if(u>255) u = 255;
-			if(u<0) u = 0;
+			uint8_t u_is_strange;
+			if (u == 128) {
+				u_is_strange = 0;
+			} else {
+				u_is_strange = 1;
+			}
+
+			
+			if ((abs(e-e_prev) < CONSTANT_ERROR_CHANGE_THRESHOLD) && (u_is_strange)) {
+					constant_error_counter++;
+			}
+			else if ((constant_error_counter > 0) && (u != 128)) {
+				constant_error_counter--;
+			}
+			
+			if (x_ref != x_ref_prev)
+			{
+				constant_error_counter = 0;
+			}
+			
+			if (constant_error_counter > CONSTANT_ERROR_LIMIT) {
+				is_stuck = 1;
+				} else if (constant_error_counter < CONSTANT_ERROR_RESET_LIMIT) {
+				is_stuck = 0;
+			}
+			
+			if(is_stuck) {
+				u = 128;
+			}
+			else if(u>255) {
+				u = 255;
+			}
+			else if(u<0) {
+				u = 0;
+			}
 			actuator_pwmSpeed(u);
 			//check if target position has been reached
 			if(e<POSITION_TOLERANCE && -e<POSITION_TOLERANCE){
 				current_gear = reference_gear;
 			}
+			e_prev = e;
+			x_ref_prev = x_ref;
 			task_is_done(TASK_P_CONTROLLER);
 		}
 		if(task_is_due(TASK_SINE)){
