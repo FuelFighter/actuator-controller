@@ -101,7 +101,7 @@ int main (void)
 	secondGearPosition = eeprom_read_word((uint16_t*)44);
 	idlePosition = eeprom_read_word((uint16_t*)42);
 	x_ref = firstGearPosition;
-	near_gear = secondGearPosition; //assuming this is safest
+	near_gear = 2; //assuming this is safest
 	closest_gear = near_gear;
 	
 	task_start(TASK_LED, 1000);	//task 1 is due after 1000 interrupt cycles 
@@ -120,15 +120,15 @@ int main (void)
 		if (task_is_due(TASK_LED)){
 			rgbled_toggle(LED_BLUE);
 			
-			if (near_gear == firstGearPosition) {
+			if (near_gear == 1) {
 				rgbled_turn_off(LED_RED);
 				rgbled_turn_on(LED_GREEN);
-			} else if (near_gear == secondGearPosition) {
+			} else if (near_gear == 2) {
 				rgbled_turn_on(LED_RED);
 				rgbled_turn_off(LED_GREEN);
 			} else {
 				rgbled_turn_off(LED_GREEN);
-				rgbled_turn_off(LED_BLUE);
+				rgbled_turn_off(LED_RED);
 			}
 						
 			task_is_done(TASK_LED);
@@ -153,9 +153,9 @@ int main (void)
 						uart_puts("|");
 						uart_putint(current_gear);
 						uart_puts("|");
-						uart_putlong(adr);
+						uart_putint(near_gear);
 						uart_puts("|");
-						uart_putlong(getEncoderSpeed16());
+						uart_putlong(closest_gear);
 						uart_puts("\r\n");
 						
 			task_is_done(TASK_UART_WRITE);
@@ -242,21 +242,23 @@ int main (void)
 		if (task_is_due(TASK_P_CONTROLLER)){
 			x = ads_1115_get_reading();
 			
-			if (x > idlePosition) {
-				closest_gear = secondGearPosition;
+			if (x > idlePosition + POSITION_TOLERANCE ) {
+				closest_gear = 2;
+			} else if (x < idlePosition - POSITION_TOLERANCE) {
+				closest_gear = 1;
 			} else {
-				closest_gear = firstGearPosition;
+				closest_gear = 0;
 			}
 			
 			if (x > ((secondGearPosition-idlePosition)/2 + idlePosition) ) {
-				near_gear = secondGearPosition;
-			} else if (x < ((idlePosition - firstGearPosition)/2 + firstGearPosition))
+				near_gear = 2;
+			} else if (x < ((idlePosition - firstGearPosition)/2 + firstGearPosition ))
 			{
-				near_gear = firstGearPosition;
+				near_gear = 1;
 			} 
 			else
 			{
-				near_gear = idlePosition;
+				near_gear = 0;
 			}
 			
 			e = x_ref-x;
