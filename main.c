@@ -212,7 +212,7 @@ int main (void)
 		if(task_is_due(TASK_CAN_TX)){
 			// Send message
 			txFrame.id = ACTUATOR_CAN_ID;
-			txFrame.length = 8;
+			txFrame.length = 5;
 			
 			txFrame.data.i16[0] = getEncoderSpeed16();
 			txFrame.data.u8[2] = current_gear;
