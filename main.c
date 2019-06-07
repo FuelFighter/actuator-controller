@@ -56,6 +56,7 @@ volatile int16_t adcReading = 0;
 uint16_t firstGearPosition, idlePosition, secondGearPosition;
 uint8_t current_gear;	// current gear the motor is in. 0 = out of gear, 1 = first gear, 2 = second gear
 uint8_t reference_gear;		//requested gear (0,1,2)
+uint8_t near_gear, closest_gear;
 int8_t data;
 int16_t adr;
 void pwm_start(){
@@ -80,7 +81,7 @@ int main (void)
 {	
 	pwm_start();	//inits pwm for h bridge control
 	rgbled_init();
-	rgbled_turn_on(LED_ALL);
+	rgbled_turn_on(LED_BLUE);
 	uint8_t duty = 20;
 	int16_t x, x_ref, e, u;
 	float kp = 0.7;
@@ -100,6 +101,8 @@ int main (void)
 	secondGearPosition = eeprom_read_word((uint16_t*)44);
 	idlePosition = eeprom_read_word((uint16_t*)42);
 	x_ref = firstGearPosition;
+	near_gear = 2; //assuming this is safest
+	closest_gear = near_gear;
 	
 	task_start(TASK_LED, 1000);	//task 1 is due after 1000 interrupt cycles 
 	task_start(TASK_UART_WRITE,50);
@@ -115,7 +118,19 @@ int main (void)
 			
 		}
 		if (task_is_due(TASK_LED)){
-			rgbled_toggle(LED_ALL);
+			rgbled_toggle(LED_BLUE);
+			
+			if (near_gear == 1) {
+				rgbled_turn_off(LED_RED);
+				rgbled_turn_on(LED_GREEN);
+			} else if (near_gear == 2) {
+				rgbled_turn_on(LED_RED);
+				rgbled_turn_off(LED_GREEN);
+			} else {
+				rgbled_turn_off(LED_GREEN);
+				rgbled_turn_off(LED_RED);
+			}
+						
 			task_is_done(TASK_LED);
 		}
 		if (task_is_due(TASK_UART_WRITE)){
@@ -138,9 +153,9 @@ int main (void)
 						uart_puts("|");
 						uart_putint(current_gear);
 						uart_puts("|");
-						uart_putlong(adr);
+						uart_putint(near_gear);
 						uart_puts("|");
-						uart_putlong(getEncoderSpeed16());
+						uart_putlong(closest_gear);
 						uart_puts("\r\n");
 						
 			task_is_done(TASK_UART_WRITE);
@@ -197,11 +212,13 @@ int main (void)
 		if(task_is_due(TASK_CAN_TX)){
 			// Send message
 			txFrame.id = ACTUATOR_CAN_ID;
-			txFrame.length = 3;
+			txFrame.length = 5;
 			
 			txFrame.data.i16[0] = getEncoderSpeed16();
 			txFrame.data.u8[2] = current_gear;
-			//txFrame.data.u8[2] = 0;
+			txFrame.data.u8[3] = closest_gear;
+			txFrame.data.u8[4] = near_gear;
+			
 			
 			can_send_message(&txFrame);
 			
@@ -217,12 +234,33 @@ int main (void)
 								
 					if(rx.data.u8[0]==0){ reference_gear = 0; x_ref = idlePosition;}
 					if(rx.data.u8[0]==1){ reference_gear = 1; x_ref = firstGearPosition;}
+					if(rx.data.u8[0]==2){ reference_gear = 2; x_ref = secondGearPosition;}
 				}
 			}
 			task_is_done(TASK_CAN_RX);
 		}
 		if (task_is_due(TASK_P_CONTROLLER)){
 			x = ads_1115_get_reading();
+			
+			if (x > idlePosition + POSITION_TOLERANCE ) {
+				closest_gear = 2;
+			} else if (x < idlePosition - POSITION_TOLERANCE) {
+				closest_gear = 1;
+			} else {
+				closest_gear = 0;
+			}
+			
+			if (x > ((secondGearPosition-idlePosition)/2 + idlePosition) ) {
+				near_gear = 2;
+			} else if (x < ((idlePosition - firstGearPosition)/2 + firstGearPosition ))
+			{
+				near_gear = 1;
+			} 
+			else
+			{
+				near_gear = 0;
+			}
+			
 			e = x_ref-x;
 			u = kp*e+128;
 			if(u>255) u = 255;
