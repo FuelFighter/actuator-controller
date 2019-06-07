@@ -42,3 +42,42 @@ ipch/
 # Visual Studio profiler
 *.psess
 *.vsp
+.vs/FF ACTUATOR MOTOR 2018/v14/.atsuo
+Debug/ActuatorDrivers/actuator.d
+Debug/ActuatorDrivers/actuator.o
+Debug/ActuatorDrivers/ads_1115.o
+Debug/ActuatorDrivers/encoder.d
+Debug/ActuatorDrivers/encoder.o
+Debug/ActuatorDrivers/i2c_master.d
+Debug/ActuatorDrivers/i2c_master.o
+Debug/ActuatorDrivers/PIDcontrol.d
+Debug/ActuatorDrivers/PIDcontrol.o
+Debug/AVR-UART-lib/usart.d
+Debug/AVR-UART-lib/usart.o
+Debug/FF ACTUATOR MOTOR 2018.elf
+Debug/FF ACTUATOR MOTOR 2018.hex
+Debug/FF ACTUATOR MOTOR 2018.lss
+Debug/FF ACTUATOR MOTOR 2018.map
+Debug/FF ACTUATOR MOTOR 2018.srec
+Debug/hardwareinit.o
+Debug/main.d
+Debug/main.o
+Debug/Makefile
+Debug/UniversalModuleDrivers/adc.d
+Debug/UniversalModuleDrivers/adc.o
+Debug/UniversalModuleDrivers/can.d
+Debug/UniversalModuleDrivers/can.o
+Debug/UniversalModuleDrivers/rgbled.d
+Debug/UniversalModuleDrivers/rgbled.o
+Debug/UniversalModuleDrivers/spi.d
+Debug/UniversalModuleDrivers/spi.o
+Debug/UniversalModuleDrivers/timer.d
+Debug/UniversalModuleDrivers/timer.o
+Debug/UniversalModuleDrivers/timer16.d
+Debug/UniversalModuleDrivers/timer16.o
+Debug/UniversalModuleDrivers/uart.d
+Debug/UniversalModuleDrivers/uart.o
+Debug/UniversalModuleDrivers/usbdb.d
+Debug/UniversalModuleDrivers/usbdb.o
+FF ACTUATOR MOTOR 2018.componentinfo.xml
+FF ACTUATOR MOTOR 2018.cproj
