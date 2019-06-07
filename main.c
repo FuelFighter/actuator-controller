@@ -9,8 +9,8 @@
 #define CONTROLLER_CAN_ID 0x251		// CAN ID from controller to actuator	(receive) (251 for MC_1, 261 for MC_2)
 
 #define CONSTANT_ERROR_LIMIT 100 // 
-#define CONSTANT_ERROR_RESET_LIMIT 50
-#define CONSTANT_ERROR_CHANGE_THRESHOLD 1
+#define CONSTANT_ERROR_RESET_LIMIT 20
+#define CONSTANT_ERROR_CHANGE_THRESHOLD 50
 
 #ifndef F_CPU
 	#define F_CPU 8000000UL
@@ -104,9 +104,9 @@ int main (void)
 	rgbled_init();
 	rgbled_turn_on(LED_BLUE);
 	uint8_t duty = 20;
-	int16_t x, x_ref, e, u;
+	int16_t x, x_ref, x_ref_prev, e, u;
 	int16_t e_prev = 0;
-	int constant_error_counter = 0;
+	long constant_error_counter = 0;
 	uint8_t is_stuck = 0;
 	float kp = 0.7;
 	char msg[22]; // heading, 20 digit bytes, NULL
@@ -125,6 +125,7 @@ int main (void)
 	secondGearPosition = eeprom_read_word((uint16_t*)44);
 	idlePosition = eeprom_read_word((uint16_t*)42);
 	x_ref = firstGearPosition;
+	x_ref_prev = x_ref;
 	
 	task_start(TASK_LED, 1000);	//task 1 is due after 1000 interrupt cycles 
 	task_start(TASK_UART_WRITE,50);
@@ -162,17 +163,17 @@ int main (void)
 
 						uart_putint(x_ref);
 						uart_puts("|");
-						uart_putint(x);
+						uart_putint(e);
 						uart_puts("|");
 						uart_putint(u);
 						uart_puts("|");
-						uart_putint(reference_gear);
+						uart_putlong(constant_error_counter);
 						uart_puts("|");
 						uart_putint(current_gear);
 						uart_puts("|");
 						uart_putlong(adr);
 						uart_puts("|");
-						uart_putlong(getEncoderSpeed16());
+						uart_putint(is_stuck);
 						uart_puts("\r\n");
 						
 			task_is_done(TASK_UART_WRITE);
@@ -258,7 +259,23 @@ int main (void)
 			e = x_ref-x;
 			u = kp*e+128;
 			
-			is_stuck = check_if_stuck(e, e_prev, &constant_error_counter);
+			if (abs(e-e_prev) < CONSTANT_ERROR_CHANGE_THRESHOLD) {
+				constant_error_counter++;
+			}
+			else if (constant_error_counter > 0) {
+				constant_error_counter--;
+			}
+			
+			if (x_ref != x_ref_prev)
+			{
+				constant_error_counter = 0;
+			}
+			
+			if (constant_error_counter > CONSTANT_ERROR_LIMIT) {
+				is_stuck = 1;
+				} else if (constant_error_counter < CONSTANT_ERROR_RESET_LIMIT  && 0) {
+				is_stuck = 0;
+			}
 			
 			if(is_stuck) {
 				u = 128;
@@ -275,6 +292,7 @@ int main (void)
 				current_gear = reference_gear;
 			}
 			e_prev = e;
+			x_ref_prev = x_ref;
 			task_is_done(TASK_P_CONTROLLER);
 		}
 		if(task_is_due(TASK_SINE)){
