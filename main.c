@@ -60,6 +60,7 @@ volatile int16_t adcReading = 0;
 uint16_t firstGearPosition, idlePosition, secondGearPosition;
 uint8_t current_gear;	// current gear the motor is in. 0 = out of gear, 1 = first gear, 2 = second gear
 uint8_t reference_gear;		//requested gear (0,1,2)
+uint8_t near_gear, closest_gear;
 int8_t data;
 int16_t adr;
 void pwm_start(){
@@ -110,6 +111,8 @@ int main (void)
 	idlePosition = eeprom_read_word((uint16_t*)42);
 	x_ref = firstGearPosition;
 	x_ref_prev = x_ref;
+	near_gear = 2; //assuming this is safest
+	closest_gear = near_gear;
 	
 	task_start(TASK_LED, 1000);	//task 1 is due after 1000 interrupt cycles 
 	task_start(TASK_UART_WRITE,50);
@@ -214,11 +217,13 @@ int main (void)
 		if(task_is_due(TASK_CAN_TX)){
 			// Send message
 			txFrame.id = ACTUATOR_CAN_ID;
-			txFrame.length = 3;
+			txFrame.length = 5;
 			
 			txFrame.data.i16[0] = getEncoderSpeed16();
 			txFrame.data.u8[2] = current_gear;
-			//txFrame.data.u8[2] = 0;
+			txFrame.data.u8[3] = closest_gear;
+			txFrame.data.u8[4] = near_gear;
+			
 			
 			can_send_message(&txFrame);
 			
@@ -234,12 +239,33 @@ int main (void)
 								
 					if(rx.data.u8[0]==0){ reference_gear = 0; x_ref = idlePosition;}
 					if(rx.data.u8[0]==1){ reference_gear = 1; x_ref = firstGearPosition;}
+					if(rx.data.u8[0]==2){ reference_gear = 2; x_ref = secondGearPosition;}
 				}
 			}
 			task_is_done(TASK_CAN_RX);
 		}
 		if (task_is_due(TASK_P_CONTROLLER)){
 			x = ads_1115_get_reading();
+			
+			if (x > idlePosition + POSITION_TOLERANCE ) {
+				closest_gear = 2;
+			} else if (x < idlePosition - POSITION_TOLERANCE) {
+				closest_gear = 1;
+			} else {
+				closest_gear = 0;
+			}
+			
+			if (x > ((secondGearPosition-idlePosition)/2 + idlePosition) ) {
+				near_gear = 2;
+			} else if (x < ((idlePosition - firstGearPosition)/2 + firstGearPosition ))
+			{
+				near_gear = 1;
+			} 
+			else
+			{
+				near_gear = 0;
+			}
+			
 			e = x_ref-x;
 			u = kp*e+128;
 			uint8_t u_is_strange;
