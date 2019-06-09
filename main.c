@@ -11,6 +11,7 @@
 #define CONSTANT_ERROR_LIMIT 300 // 
 #define CONSTANT_ERROR_RESET_LIMIT 200
 #define CONSTANT_ERROR_CHANGE_THRESHOLD 40
+#define U_NEAR_U0_THRESHOLD 3
 
 #ifndef F_CPU
 	#define F_CPU 8000000UL
@@ -90,7 +91,7 @@ int main (void)
 	uint8_t duty = 20;
 	int16_t x, x_ref, x_ref_prev, e, u, u0;
 	int16_t e_prev = 0;
-	uint8_t u_is_128;
+	uint8_t u_is_u0;
 	long constant_error_counter = 0;
 	uint8_t is_stuck = 0;
 	u0 = 128;
@@ -157,7 +158,7 @@ int main (void)
 						uart_puts("|");
 						uart_putlong(constant_error_counter);
 						uart_puts("|");
-						uart_putint(u_is_128);
+						uart_putint(u_is_u0);
 						uart_puts("|");
 						uart_putint(u != 128);
 						uart_puts("|");
@@ -268,18 +269,13 @@ int main (void)
 			}
 			
 			e = x_ref-x;
-			u = kp*e+128;
-			if (u == 128) {
-				u_is_128 = 1;
-			} else {
-				u_is_128 = 0;
-			}
+			u = kp*e+u0;
 
 			
-			if ((abs(e-e_prev) < CONSTANT_ERROR_CHANGE_THRESHOLD) && (!u_is_128)) {
+			if ((abs(e-e_prev) < CONSTANT_ERROR_CHANGE_THRESHOLD) && (!is_stuck)) {
 					constant_error_counter++;
 			}
-			else if ((constant_error_counter > 0) && (u != 128)) {
+			else if ((constant_error_counter > 0) && (!is_stuck)) {
 				constant_error_counter--;
 			}
 			
@@ -295,7 +291,7 @@ int main (void)
 			}
 			
 			if(is_stuck) {
-				u = 128;
+				u = u0;
 			}
 			else if(u>255) {
 				u = 255;
