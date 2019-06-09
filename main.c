@@ -90,6 +90,7 @@ int main (void)
 	uint8_t duty = 20;
 	int16_t x, x_ref, x_ref_prev, e, u, u0;
 	int16_t e_prev = 0;
+	uint8_t u_is_128;
 	long constant_error_counter = 0;
 	uint8_t is_stuck = 0;
 	u0 = 128;
@@ -156,7 +157,7 @@ int main (void)
 						uart_puts("|");
 						uart_putlong(constant_error_counter);
 						uart_puts("|");
-						uart_putint(current_gear);
+						uart_putint(u_is_128);
 						uart_puts("|");
 						uart_putint(u != 128);
 						uart_puts("|");
@@ -268,15 +269,14 @@ int main (void)
 			
 			e = x_ref-x;
 			u = kp*e+128;
-			uint8_t u_is_strange;
 			if (u == 128) {
-				u_is_strange = 0;
+				u_is_128 = 1;
 			} else {
-				u_is_strange = 1;
+				u_is_128 = 0;
 			}
 
 			
-			if ((abs(e-e_prev) < CONSTANT_ERROR_CHANGE_THRESHOLD) && (u_is_strange)) {
+			if ((abs(e-e_prev) < CONSTANT_ERROR_CHANGE_THRESHOLD) && (!u_is_128)) {
 					constant_error_counter++;
 			}
 			else if ((constant_error_counter > 0) && (u != 128)) {
