@@ -93,6 +93,7 @@ int main (void)
 	int16_t e_prev = 0;
 	uint8_t u_is_u0;
 	long constant_error_counter = 0;
+	uint8_t pause_counter = 0;
 	uint8_t is_stuck = 0;
 	u0 = 128;
 	float kp = 0.7;
@@ -272,26 +273,29 @@ int main (void)
 			u = kp*e+u0;
 
 			
-			if ((abs(e-e_prev) < CONSTANT_ERROR_CHANGE_THRESHOLD) && (!is_stuck)) {
-					constant_error_counter++;
+			if ((abs(e-e_prev) < CONSTANT_ERROR_CHANGE_THRESHOLD) && (!pause_counter)) {
+				constant_error_counter++;
 			}
-			else if ((constant_error_counter > 0) && (!is_stuck)) {
+			else if ((constant_error_counter > 0) && (!pause_counter)) {
 				constant_error_counter--;
 			}
 			
 			if (x_ref != x_ref_prev)
 			{
 				constant_error_counter = 0;
+				pause_counter = 0;
 			}
 			
 			if (constant_error_counter > CONSTANT_ERROR_LIMIT) {
 				is_stuck = 1;
-				} else if (constant_error_counter < CONSTANT_ERROR_RESET_LIMIT) {
+			} else if (constant_error_counter < CONSTANT_ERROR_RESET_LIMIT) {
 				is_stuck = 0;
+				pause_counter = 0;
 			}
 			
 			if(is_stuck) {
 				u = u0;
+				pause_counter = 1;
 			}
 			else if(u>255) {
 				u = 255;
@@ -303,6 +307,7 @@ int main (void)
 			//check if target position has been reached
 			if(e<POSITION_TOLERANCE && -e<POSITION_TOLERANCE){
 				current_gear = reference_gear;
+				pause_counter = 1;
 			}
 			e_prev = e;
 			x_ref_prev = x_ref;
