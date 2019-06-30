@@ -258,9 +258,9 @@ int main (void)
 				closest_gear = 0;
 			}
 			
-			if (x > ((secondGearPosition-idlePosition)/2 + idlePosition) ) {
+			if (x > ((3/4)*(secondGearPosition-idlePosition) + idlePosition) ) {
 				near_gear = 2;
-			} else if (x < ((idlePosition - firstGearPosition)/2 + firstGearPosition ))
+			} else if (x < ((1/2)*(idlePosition - firstGearPosition) + firstGearPosition ))
 			{
 				near_gear = 1;
 			} 
