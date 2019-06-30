@@ -5,12 +5,12 @@
  * Author : Johannes Nadler
  */ 
 
-#define ACTUATOR_CAN_ID 0x120		// CAN ID from actuator to controller (transmit) (120 for MC_1, 220 for MC_2)
-#define CONTROLLER_CAN_ID 0x251		// CAN ID from controller to actuator	(receive) (251 for MC_1, 261 for MC_2)
+#define ACTUATOR_CAN_ID 0x220		// CAN ID from actuator to controller (transmit) (120 for MC_1/right, 220 for MC_2/left)
+#define CONTROLLER_CAN_ID 0x261		// CAN ID from controller to actuator	(receive) (251 for MC_1/right, 261 for MC_2/left)
 
 #define CONSTANT_ERROR_LIMIT 300 // 
 #define CONSTANT_ERROR_RESET_LIMIT 200
-#define CONSTANT_ERROR_CHANGE_THRESHOLD 40
+#define CONSTANT_ERROR_CHANGE_THRESHOLD 10
 #define U_NEAR_U0_THRESHOLD 3
 
 #ifndef F_CPU
