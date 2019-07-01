@@ -5,13 +5,13 @@
  * Author : Johannes Nadler
  */ 
 
-#define ACTUATOR_CAN_ID 0x220		// CAN ID from actuator to controller (transmit) (120 for MC_1/right, 220 for MC_2/left)
-#define CONTROLLER_CAN_ID 0x261		// CAN ID from controller to actuator	(receive) (251 for MC_1/right, 261 for MC_2/left)
+#define ACTUATOR_CAN_ID 0x120		// CAN ID from actuator to controller (transmit) (120 for MC_1/right, 220 for MC_2/left)
+#define CONTROLLER_CAN_ID 0x251		// CAN ID from controller to actuator	(receive) (251 for MC_1/right, 261 for MC_2/left)
 
 #define CONSTANT_ERROR_LIMIT 300 // 
 #define CONSTANT_ERROR_RESET_LIMIT 200
 #define CONSTANT_ERROR_CHANGE_THRESHOLD 10
-#define U_NEAR_U0_THRESHOLD 3
+#define CLOSEST_GEAR_FACTOR 4
 
 #ifndef F_CPU
 	#define F_CPU 8000000UL
@@ -151,17 +151,17 @@ int main (void)
 			uart_putint(x);
 			uart_puts("\r\n");*/
 
-						uart_putint(x_ref);
+						uart_putint(x);
 						uart_puts("|");
 						uart_putint(e);
 						uart_puts("|");
 						uart_putint(u);
 						uart_puts("|");
-						uart_putlong(constant_error_counter);
+						uart_putlong((((0.5)*(secondGearPosition-idlePosition)) + idlePosition));
 						uart_puts("|");
-						uart_putint(u_is_u0);
+						uart_putint(closest_gear);
 						uart_puts("|");
-						uart_putint(u != 128);
+						uart_putint(near_gear);
 						uart_puts("|");
 						uart_putint(is_stuck);
 						uart_puts("\r\n");
@@ -250,17 +250,17 @@ int main (void)
 		if (task_is_due(TASK_P_CONTROLLER)){
 			x = ads_1115_get_reading();
 			
-			if (x > idlePosition + POSITION_TOLERANCE ) {
+			if (x > idlePosition + CLOSEST_GEAR_FACTOR*POSITION_TOLERANCE ) {
 				closest_gear = 2;
-			} else if (x < idlePosition - POSITION_TOLERANCE) {
+			} else if (x < idlePosition - CLOSEST_GEAR_FACTOR*POSITION_TOLERANCE) {
 				closest_gear = 1;
 			} else {
 				closest_gear = 0;
 			}
 			
-			if (x > ((3/4)*(secondGearPosition-idlePosition) + idlePosition) ) {
+			if (x > ((0.5)*(secondGearPosition-idlePosition) + idlePosition) ) {
 				near_gear = 2;
-			} else if (x < ((1/2)*(idlePosition - firstGearPosition) + firstGearPosition ))
+			} else if (x < ((0.5)*(idlePosition - firstGearPosition) + firstGearPosition ))
 			{
 				near_gear = 1;
 			} 
