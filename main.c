@@ -5,12 +5,13 @@
  * Author : Johannes Nadler
  */ 
 
-#define ACTUATOR_CAN_ID 0x120		// CAN ID from actuator to controller (transmit) (120 for MC_1, 220 for MC_2)
-#define CONTROLLER_CAN_ID 0x251		// CAN ID from controller to actuator	(receive) (251 for MC_1, 261 for MC_2)
+#define ACTUATOR_CAN_ID 0x220		// CAN ID from actuator to controller (transmit) (120 for MC_1/right, 220 for MC_2/left)
+#define CONTROLLER_CAN_ID 0x261		// CAN ID from controller to actuator	(receive) (251 for MC_1/right, 261 for MC_2/left)
 
 #define CONSTANT_ERROR_LIMIT 300 // 
 #define CONSTANT_ERROR_RESET_LIMIT 200
-#define CONSTANT_ERROR_CHANGE_THRESHOLD 40
+#define CONSTANT_ERROR_CHANGE_THRESHOLD 10
+#define U_NEAR_U0_THRESHOLD 3
 
 #ifndef F_CPU
 	#define F_CPU 8000000UL
@@ -90,7 +91,9 @@ int main (void)
 	uint8_t duty = 20;
 	int16_t x, x_ref, x_ref_prev, e, u, u0;
 	int16_t e_prev = 0;
+	uint8_t u_is_u0;
 	long constant_error_counter = 0;
+	uint8_t pause_counter = 0;
 	uint8_t is_stuck = 0;
 	u0 = 128;
 	float kp = 0.7;
@@ -156,7 +159,7 @@ int main (void)
 						uart_puts("|");
 						uart_putlong(constant_error_counter);
 						uart_puts("|");
-						uart_putint(current_gear);
+						uart_putint(u_is_u0);
 						uart_puts("|");
 						uart_putint(u != 128);
 						uart_puts("|");
@@ -255,9 +258,9 @@ int main (void)
 				closest_gear = 0;
 			}
 			
-			if (x > ((secondGearPosition-idlePosition)/2 + idlePosition) ) {
+			if (x > ((3/4)*(secondGearPosition-idlePosition) + idlePosition) ) {
 				near_gear = 2;
-			} else if (x < ((idlePosition - firstGearPosition)/2 + firstGearPosition ))
+			} else if (x < ((1/2)*(idlePosition - firstGearPosition) + firstGearPosition ))
 			{
 				near_gear = 1;
 			} 
@@ -267,35 +270,32 @@ int main (void)
 			}
 			
 			e = x_ref-x;
-			u = kp*e+128;
-			uint8_t u_is_strange;
-			if (u == 128) {
-				u_is_strange = 0;
-			} else {
-				u_is_strange = 1;
-			}
+			u = kp*e+u0;
 
 			
-			if ((abs(e-e_prev) < CONSTANT_ERROR_CHANGE_THRESHOLD) && (u_is_strange)) {
-					constant_error_counter++;
+			if ((abs(e-e_prev) < CONSTANT_ERROR_CHANGE_THRESHOLD) && (!pause_counter)) {
+				constant_error_counter++;
 			}
-			else if ((constant_error_counter > 0) && (u != 128)) {
+			else if ((constant_error_counter > 0) && (!pause_counter)) {
 				constant_error_counter--;
 			}
 			
 			if (x_ref != x_ref_prev)
 			{
 				constant_error_counter = 0;
+				pause_counter = 0;
 			}
 			
 			if (constant_error_counter > CONSTANT_ERROR_LIMIT) {
 				is_stuck = 1;
-				} else if (constant_error_counter < CONSTANT_ERROR_RESET_LIMIT) {
+			} else if (constant_error_counter < CONSTANT_ERROR_RESET_LIMIT) {
 				is_stuck = 0;
+				pause_counter = 0;
 			}
 			
 			if(is_stuck) {
-				u = 128;
+				u = u0;
+				pause_counter = 1;
 			}
 			else if(u>255) {
 				u = 255;
@@ -307,6 +307,7 @@ int main (void)
 			//check if target position has been reached
 			if(e<POSITION_TOLERANCE && -e<POSITION_TOLERANCE){
 				current_gear = reference_gear;
+				pause_counter = 1;
 			}
 			e_prev = e;
 			x_ref_prev = x_ref;
